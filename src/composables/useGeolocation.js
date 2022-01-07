@@ -9,10 +9,9 @@ export default function useGeolocation() {
   let watcher = null;
   onMounted(() => {
     if (isSupported) {
-      watcher = navigator.geolocation.watchPosition((position) => {
-        console.log("--- ", position.coords);
-        coords.value = position.coords;
-      });
+      watcher = navigator.geolocation.watchPosition(
+        (position) => (coords.value = position.coords)
+      );
     }
   });
 
