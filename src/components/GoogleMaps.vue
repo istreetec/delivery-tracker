@@ -10,21 +10,23 @@ import useGeolocation from "../composables/useGeolocation";
 
 export default {
   setup() {
-    const { launchMap, drawRoute, deliveryAddress } = useMap();
     const { coords } = useGeolocation();
+    const currentPosition = computed(() => ({
+      lat: coords.value.latitude,
+      lng: coords.value.longitude
+    }));
+    const { launchMap, drawRoute, deliveryAddress } = useMap({
+      currentPosition: currentPosition.value
+    });
     const mapDiv = ref(null);
 
     const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || "apikey";
     const loader = new Loader({ apiKey: GOOGLE_MAPS_API_KEY });
 
-    const currentPosition = computed(() => ({
-      lat: coords.value.latitude,
-      lng: coords.value.longitude
-    }));
-
     onMounted(async () => {
       await loader.load();
-      launchMap({ mapDiv: mapDiv.value, center: currentPosition.value });
+      launchMap({ mapDiv: mapDiv.value });
+
       // Simulate drawing the route
       drawRoute();
       // Register click event
