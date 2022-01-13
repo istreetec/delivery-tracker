@@ -9,6 +9,8 @@ export default function useMap({ currentPosition: center }) {
   const directionsService = ref(null);
   const directionsRenderer = ref(null);
   const riderMarker = ref(null);
+  const remainingSeconds = ref(0);
+  const speedFactor = ref(200);
 
   const launchMap = ({ mapDiv }) => {
     directionsService.value = new google.maps.DirectionsService();
@@ -48,21 +50,13 @@ export default function useMap({ currentPosition: center }) {
     };
 
     directionsService.value.route(request.value, (result, status) => {
-      // Hide existing markers immediately before drawing new route
-      Object.keys(waypoints.value).length &&
-        waypoints.value.map((waypoint) => {
-          waypoint.visible = false;
-        });
-      // Reset waypoints
-      waypoints.value = [];
-
       if (status === google.maps.DirectionsStatus.OK) {
-        leg.value = result.routes[0].legs[0];
+        // Reset waypoints
+        waypoints.value = [];
+        leg.value = result.routes[0].legs[0]; // single route
 
-        leg.value.steps.map((step) => {
-          // Accumalate all the route waypoints
-          waypoints.value.push(step.start_location);
-        });
+        loadWaypoints(leg.value.steps);
+        if (remainingSeconds.value > 0) waypoints.value.push(leg.end_location);
 
         // Push destination's latlng too
         waypoints.value.push(leg.value.end_location);
@@ -70,10 +64,37 @@ export default function useMap({ currentPosition: center }) {
         moveRider();
         directionsRenderer.value.setDirections(result);
       } else {
-        console.log(status);
+        console.error(status);
       }
     });
   }
+
+  const loadWaypoints = (steps) => {
+    steps.map((step) => {
+      let stepSeconds = step.duration.value;
+      let nextStopSeconds = speedFactor.value - remainingSeconds.value;
+
+      while (nextStopSeconds <= stepSeconds) {
+        let nextStopLatLng = getPointBetween(
+          step.start_location,
+          step.end_location,
+          nextStopSeconds / stepSeconds
+        );
+        waypoints.value.push(nextStopLatLng);
+        nextStopSeconds += speedFactor.value;
+      }
+      remainingSeconds.value =
+        stepSeconds + speedFactor.value - nextStopSeconds;
+    });
+  };
+
+  // helper method to calculate a point between A and B at some ratio
+  const getPointBetween = (a, b, ratio) => {
+    return new google.maps.LatLng(
+      a.lat() + (b.lat() - a.lat()) * ratio,
+      a.lng() + (b.lng() - a.lng()) * ratio
+    );
+  };
 
   watch(destinationAddress, () => {
     drawRoute();
